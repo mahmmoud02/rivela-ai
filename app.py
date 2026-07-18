@@ -27,10 +27,16 @@ from report import (DISCLAIMER, build_combined_narrative, build_imaging_narrativ
 app = Flask(__name__)
 app.secret_key = os.environ.get("CHESTAI_SECRET_KEY", "dev-secret-change-me")
 
-# Auto-create the database schema on first boot (Railway / fresh environments)
+# Auto-create the database schema and default admin account on first boot
 if not os.path.exists(os.path.join(os.path.dirname(__file__), "instance", "chestai.db")):
     from db import init_db
+    from auth import create_user
     init_db()
+    create_user(
+        os.environ.get("DEFAULT_ADMIN_USERNAME", "admin"),
+        os.environ.get("DEFAULT_ADMIN_PASSWORD", "rivela2026"),
+        "admin",
+    )
 
 UPLOAD_DIR = os.path.join(app.static_folder, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
