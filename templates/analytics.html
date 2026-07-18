@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Analytics — Rivela AI{% endblock %}
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<div class="page-header">
+    <h1>Analytics</h1>
+    <div class="sub">Aggregated across your patients only</div>
+</div>
+
+<div class="stat-cards">
+    <div class="stat-card">
+        <div class="num num-teal">{{ stats.patients }}</div>
+        <div class="label">Patients</div>
+    </div>
+    <div class="stat-card">
+        <div class="num">{{ stats.checkups }}</div>
+        <div class="label">Total checkups</div>
+    </div>
+    <div class="stat-card">
+        <div class="num">{{ stats.avg_confidence }}%</div>
+        <div class="label">Avg fused confidence</div>
+    </div>
+    <div class="stat-card">
+        <div class="num num-green">{{ data.status_confirmed }}</div>
+        <div class="label">Confirmed findings</div>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:0.85rem;">
+    <div class="card">
+        <h3>Disease frequency</h3>
+        <p style="font-size:0.72rem; color:var(--text-2); margin-top:-0.4rem; margin-bottom:0.75rem;">Top finding across all checkups</p>
+        <canvas id="diseaseChart" height="220"></canvas>
+    </div>
+    <div class="card">
+        <h3>Checkups over time</h3>
+        <p style="font-size:0.72rem; color:var(--text-2); margin-top:-0.4rem; margin-bottom:0.75rem;">Number of checkups per day</p>
+        <canvas id="timeChart" height="220"></canvas>
+    </div>
+</div>
+
+<div class="grid-3">
+    <div class="card">
+        <h3>Finding status</h3>
+        <p style="font-size:0.72rem; color:var(--text-2); margin-top:-0.4rem; margin-bottom:0.75rem;">Fused predictions only</p>
+        <canvas id="statusChart" height="200"></canvas>
+    </div>
+    <div class="card">
+        <h3>Modality used</h3>
+        <p style="font-size:0.72rem; color:var(--text-2); margin-top:-0.4rem; margin-bottom:0.75rem;">X-ray only vs fused</p>
+        <canvas id="modalityChart" height="200"></canvas>
+    </div>
+    <div class="card">
+        <h3>Confidence levels</h3>
+        <p style="font-size:0.72rem; color:var(--text-2); margin-top:-0.4rem; margin-bottom:0.75rem;">High ≥85% · Moderate 60–85% · Low &lt;60%</p>
+        <canvas id="confChart" height="200"></canvas>
+    </div>
+</div>
+
+<script>
+const TEAL   = '#2DD4BF';
+const BLUE   = '#5B8DEF';
+const GREEN  = '#34D399';
+const AMBER  = '#F2A93B';
+const RED    = '#F2555A';
+const DIM    = '#5A6278';
+const BORDER = 'rgba(255,255,255,0.06)';
+
+Chart.defaults.color = '#98A1B5';
+Chart.defaults.borderColor = BORDER;
+
+new Chart(document.getElementById('diseaseChart'), {
+    type: 'bar',
+    data: {
+        labels: {{ data.disease_labels | tojson }},
+        datasets: [{ label: 'Checkups', data: {{ data.disease_counts | tojson }},
+            backgroundColor: TEAL, borderRadius: 4 }]
+    },
+    options: {
+        indexAxis: 'y', responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { ticks: { stepSize: 1 }, grid: { color: BORDER } },
+            y: { grid: { display: false } }
+        }
+    }
+});
+
+new Chart(document.getElementById('timeChart'), {
+    type: 'line',
+    data: {
+        labels: {{ data.time_labels | tojson }},
+        datasets: [{ label: 'Checkups', data: {{ data.time_counts | tojson }},
+            borderColor: TEAL, backgroundColor: 'rgba(45,212,191,0.1)',
+            fill: true, tension: 0.3, pointRadius: 4 }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { color: BORDER } },
+            y: { ticks: { stepSize: 1 }, grid: { color: BORDER } }
+        }
+    }
+});
+
+new Chart(document.getElementById('statusChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Confirmed', 'Possible', 'Uncertain'],
+        datasets: [{ data: [{{ data.status_confirmed }}, {{ data.status_possible }}, {{ data.status_uncertain }}],
+            backgroundColor: [GREEN, AMBER, RED], borderWidth: 0 }]
+    },
+    options: { responsive: true, cutout: '60%',
+        plugins: { legend: { position: 'bottom', labels: { padding: 12, boxWidth: 12 } } } }
+});
+
+new Chart(document.getElementById('modalityChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Fused', 'X-ray only', 'Symptoms only'],
+        datasets: [{ data: [{{ data.modality_fused }}, {{ data.modality_xray }}, {{ data.modality_symptoms }}],
+            backgroundColor: [TEAL, BLUE, AMBER], borderWidth: 0 }]
+    },
+    options: { responsive: true, cutout: '60%',
+        plugins: { legend: { position: 'bottom', labels: { padding: 12, boxWidth: 12 } } } }
+});
+
+new Chart(document.getElementById('confChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['High (≥85%)', 'Moderate (60–85%)', 'Low (<60%)'],
+        datasets: [{ data: [{{ data.conf_high }}, {{ data.conf_moderate }}, {{ data.conf_low }}],
+            backgroundColor: [GREEN, AMBER, RED], borderWidth: 0 }]
+    },
+    options: { responsive: true, cutout: '60%',
+        plugins: { legend: { position: 'bottom', labels: { padding: 12, boxWidth: 12 } } } }
+});
+</script>
+
+{% endblock %}

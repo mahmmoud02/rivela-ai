@@ -1,0 +1,59 @@
+{% extends "patient_base.html" %}
+{% block tab_content %}
+
+{% if predictions %}
+<div class="card" style="padding:0; overflow:hidden;">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>Primary finding</th>
+                <th>Status</th>
+                <th>Modality</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in predictions %}
+            <tr>
+                <td class="mono" style="color:var(--text-3);">{{ loop.index }}</td>
+                <td class="mono" style="color:var(--text-2); font-size:0.78rem;">{{ p.created_at[:16] }}</td>
+                <td>
+                    <span style="font-weight:600;">{{ p.top_disease or "—" }}</span>
+                    {% if p.conflict %}
+                    <span class="conflict-badge" style="margin-left:0.3rem;">Conflict</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if p.status %}
+                    <span class="status-pill status-{{ p.status }}">{{ p.status }}</span>
+                    {% else %}—{% endif %}
+                </td>
+                <td>
+                    {% if p.fused_result_json %}
+                    <span class="badge badge-fused">Fused</span>
+                    {% elif p.xray_probs_json %}
+                    <span class="badge badge-xray">X-ray</span>
+                    {% elif p.symptom_probs_json %}
+                    <span class="badge badge-symptom">Symptoms</span>
+                    {% else %}—{% endif %}
+                </td>
+                <td>
+                    <a href="{{ url_for('patient_analysis', patient_id=patient.id, prediction_id=p.id) }}"
+                       style="font-size:0.78rem;">View →</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="big">📋</div>
+    <p>No checkups recorded yet for this patient.</p>
+    <a href="{{ url_for('new_checkup', patient_id=patient.id) }}" class="btn">Run first checkup</a>
+</div>
+{% endif %}
+
+{% endblock %}

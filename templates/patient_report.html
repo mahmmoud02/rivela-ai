@@ -1,0 +1,69 @@
+{% extends "patient_base.html" %}
+{% block tab_content %}
+
+<div class="card" style="text-align:center; padding:2rem 1.5rem; margin-bottom:0.85rem;">
+    <div style="font-size:2rem; margin-bottom:0.75rem;">📄</div>
+    <h2 style="font-size:1.2rem; font-weight:700; margin-bottom:0.4rem;">Full Patient History Report</h2>
+    <p style="color:var(--text-2); font-size:0.85rem; margin-bottom:1.5rem; max-width:400px; margin-left:auto; margin-right:auto;">
+        Includes all {{ all_records|length }} checkup{{ 's' if all_records|length != 1 else '' }}
+        — X-ray images, Grad-CAM heatmaps, findings and clinical narratives in one PDF.
+    </p>
+    {% if all_records %}
+    <a href="{{ url_for('patient_report_pdf', patient_id=patient.id) }}" class="btn" style="font-size:0.9rem; padding:0.6rem 1.75rem;">
+        Download PDF
+    </a>
+    {% else %}
+    <div style="color:var(--text-3); font-size:0.88rem;">No checkups recorded yet.</div>
+    {% endif %}
+</div>
+
+{% if all_records %}
+<div class="card" style="padding:0; overflow:hidden;">
+    <div style="padding:0.9rem 1.4rem 0; font-size:0.63rem; color:var(--text-3); text-transform:uppercase; letter-spacing:0.12em; font-family:'IBM Plex Mono',monospace;">Checkups included</div>
+    <table style="margin-top:0.5rem;">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>Primary finding</th>
+                <th>Confidence</th>
+                <th>Modality</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in all_records %}
+            {% if r.fusion_result %}
+                {% set conf = r.fusion_result.top_score %}
+                {% set modality_label = "Fused" %}
+                {% set modality_cls = "badge-fused" %}
+            {% elif r.xray_probs %}
+                {% set conf = r.xray_probs.values()|list|max %}
+                {% set modality_label = "X-ray" %}
+                {% set modality_cls = "badge-xray" %}
+            {% elif r.symptom_probs %}
+                {% set conf = r.symptom_probs.values()|list|max %}
+                {% set modality_label = "Symptoms" %}
+                {% set modality_cls = "badge-symptom" %}
+            {% else %}
+                {% set conf = none %}
+                {% set modality_label = "—" %}
+                {% set modality_cls = "" %}
+            {% endif %}
+            <tr>
+                <td class="mono" style="color:var(--text-3);">{{ loop.index }}</td>
+                <td class="mono" style="color:var(--text-2); font-size:0.78rem;">{{ r.created_at[:16] }}</td>
+                <td style="font-weight:600;">{{ r.top_disease or "—" }}</td>
+                <td class="mono">{{ "%.1f"|format(conf * 100) ~ "%" if conf is not none else "—" }}</td>
+                <td>
+                    {% if modality_cls %}
+                    <span class="badge {{ modality_cls }}">{{ modality_label }}</span>
+                    {% else %}—{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% endblock %}

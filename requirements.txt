@@ -1,0 +1,12 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+flask
+gunicorn
+werkzeug
+torch==2.4.0+cpu
+torchvision==0.19.0+cpu
+Pillow
+numpy
+matplotlib
+google-genai
+xhtml2pdf

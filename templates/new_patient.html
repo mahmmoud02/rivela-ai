@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Add patient</h1>
+<form method="post" class="card" style="max-width: 400px;">
+    <div class="field"><div class="k">Name</div><input type="text" name="name" class="v" style="width:100%;" required></div>
+    <div class="field"><div class="k">Date of birth</div><input type="date" name="dob" style="width:100%;"></div>
+    <div class="field">
+        <div class="k">Sex</div>
+        <select name="sex" style="width:100%;">
+            <option value="">—</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+        </select>
+    </div>
+    <p><button type="submit" class="btn">Add patient</button></p>
+</form>
+<a href="{{ url_for('dashboard') }}">Cancel</a>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends "patient_base.html" %}
+{% block tab_content %}
+
+<div class="grid-2" style="align-items: start;">
+    <div class="card">
+        <h3>Personal details</h3>
+        <div class="field"><div class="k">Full name</div><div class="v">{{ patient.name }}</div></div>
+        <div class="field"><div class="k">Date of birth</div><div class="v">{{ patient.dob or "Not recorded" }}</div></div>
+        <div class="field"><div class="k">Sex</div><div class="v">{{ patient.sex|capitalize if patient.sex else "Not recorded" }}</div></div>
+        <div class="field"><div class="k">Patient ID</div><div class="v mono">P{{ "%03d"|format(patient.id) }}</div></div>
+        <div class="field"><div class="k">Total checkups</div><div class="v">{{ checkup_count }}</div></div>
+        {% if latest %}
+        <div class="field"><div class="k">Last visit</div><div class="v mono">{{ latest.created_at[:10] }}</div></div>
+        {% endif %}
+    </div>
+
+    {% if latest %}
+    <div class="card">
+        <h3>Latest AI assessment</h3>
+        <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem; flex-wrap:wrap;">
+            <span style="font-size:1.1rem; font-weight:700;">{{ latest.top_disease or "—" }}</span>
+            {% if latest.status %}
+            <span class="status-pill status-{{ latest.status }}">{{ latest.status }}</span>
+            {% endif %}
+            {% if latest.conflict %}
+            <span class="conflict-badge">⚠ Conflict</span>
+            {% endif %}
+        </div>
+        <div style="font-size:0.78rem; color:var(--text-2); font-family:'IBM Plex Mono',monospace; margin-bottom:1rem;">
+            {{ latest.created_at[:16] }}
+            {% if latest.fused_result_json %} · fused prediction{% elif latest.xray_probs_json %} · x-ray only{% endif %}
+        </div>
+        {% if latest.conflict %}
+        <div style="font-size:0.8rem; color:var(--red); background:rgba(242,85,90,0.08); border:1px solid rgba(242,85,90,0.18); border-radius:8px; padding:0.6rem 0.75rem; margin-bottom:1rem;">
+            X-ray and symptom models produced conflicting top findings. Review the Analysis tab.
+        </div>
+        {% endif %}
+        <a href="{{ url_for('patient_analysis', patient_id=patient.id, prediction_id=latest.id) }}"
+           class="btn btn-sm">View full analysis →</a>
+    </div>
+    {% else %}
+    <div class="card">
+        <h3>Latest AI assessment</h3>
+        <div style="color:var(--text-3); font-size:0.88rem;">
+            No checkups yet.
+            <a href="{{ url_for('new_checkup', patient_id=patient.id) }}">Run the first one →</a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% if latest and latest.xray_image_path %}
+<div class="card">
+    <h3>Latest chest X-ray</h3>
+    <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-start;">
+        <img src="{{ url_for('static', filename=latest.xray_image_path) }}"
+             style="max-width:240px; border-radius:8px; border:1px solid var(--border);" alt="Latest X-ray">
+        {% if latest.overlay_image_path %}
+        <div>
+            <div style="font-size:0.63rem; color:var(--text-3); text-transform:uppercase; letter-spacing:0.08em; font-family:'IBM Plex Mono',monospace; margin-bottom:0.4rem;">Grad-CAM overlay</div>
+            <img src="{{ url_for('static', filename=latest.overlay_image_path) }}"
+                 style="max-width:240px; border-radius:8px; border:1px solid var(--border);" alt="Grad-CAM overlay">
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

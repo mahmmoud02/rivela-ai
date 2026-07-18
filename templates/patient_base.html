@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="patient-header">
+    <div class="patient-header-left">
+        <div class="avatar">{{ patient.name[:2]|upper }}</div>
+        <div>
+            <h1>
+                {{ patient.name }}
+                <span class="patient-id-badge">P{{ "%03d"|format(patient.id) }}</span>
+                {% if latest is defined and latest and latest.conflict %}
+                <span class="conflict-badge">⚠ Conflict</span>
+                {% endif %}
+            </h1>
+            <div class="patient-meta">
+                {% if patient.dob %}DOB {{ patient.dob }}{% endif %}
+                {% if patient.sex %} · {{ patient.sex|capitalize }}{% endif %}
+                 · {{ checkup_count }} checkup{{ 's' if checkup_count != 1 else '' }}
+            </div>
+        </div>
+    </div>
+    <a href="{{ url_for('new_checkup', patient_id=patient.id) }}" class="btn btn-sm">+ New Checkup</a>
+</div>
+
+<div class="tabs">
+    <a href="{{ url_for('patient_info', patient_id=patient.id) }}"
+       class="{{ 'active' if active_tab == 'info' else '' }}">Overview</a>
+    <a href="{{ url_for('patient_history', patient_id=patient.id) }}"
+       class="{{ 'active' if active_tab == 'history' else '' }}">History</a>
+    {% if latest_prediction_id %}
+    <a href="{{ url_for('patient_analysis', patient_id=patient.id, prediction_id=latest_prediction_id) }}"
+       class="{{ 'active' if active_tab == 'analysis' else '' }}">Analysis</a>
+    <a href="{{ url_for('patient_longitudinal', patient_id=patient.id) }}"
+       class="{{ 'active' if active_tab == 'longitudinal' else '' }}">Longitudinal</a>
+    <a href="{{ url_for('patient_report', patient_id=patient.id) }}"
+       class="{{ 'active' if active_tab == 'report' else '' }}">Report</a>
+    {% endif %}
+</div>
+
+{% block tab_content %}{% endblock %}
+
+{% endblock %}

@@ -1,0 +1,156 @@
+{% extends "patient_base.html" %}
+{% block tab_content %}
+
+<!-- Breadcrumb header -->
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; flex-wrap:wrap; gap:0.75rem;">
+    <div>
+        <div style="font-size:0.62rem; color:var(--text-3); font-family:'IBM Plex Mono',monospace; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:0.3rem;">
+            {{ patient.name }} · P{{ "%03d"|format(patient.id) }} · Checkup #{{ record.id }}
+        </div>
+        <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+            <span style="font-size:1.05rem; font-weight:700;">Explainability analysis</span>
+            {% if record.conflict %}
+            <span class="conflict-badge">⚠ Models disagreed</span>
+            {% endif %}
+        </div>
+        {% if record.fusion_result %}
+        <div style="font-size:0.78rem; color:var(--text-2); font-family:'IBM Plex Mono',monospace; margin-top:0.2rem;">
+            Fused confidence: {{ "%.1f"|format(record.fusion_result.top_score * 100) }}%
+            {% if record.fusion_result.conflict %}
+            &nbsp;·&nbsp;X-ray favored
+            <span style="color:var(--teal);">{{ record.fusion_result.xray_top }}</span>
+            &nbsp;·&nbsp;Symptoms favored
+            <span style="color:var(--amber);">{{ record.fusion_result.symptom_top }}</span>
+            {% endif %}
+        </div>
+        {% elif display_confidence is not none %}
+        <div style="font-size:0.78rem; color:var(--text-2); font-family:'IBM Plex Mono',monospace; margin-top:0.2rem;">
+            Confidence: {{ "%.1f"|format(display_confidence * 100) }}% · {{ display_modality }}
+        </div>
+        {% endif %}
+    </div>
+    {% set top_uncertainty = (record.xray_uncertainty or {}).get(record.top_disease) or (record.symptom_uncertainty or {}).get(record.top_disease) %}
+    {% if top_uncertainty %}
+    <div class="gauge-box">
+        <div class="num" style="font-size:1.2rem;">±{{ "%.1f"|format(top_uncertainty.std * 100) }}%</div>
+        <div class="label">{{ "Low" if top_uncertainty.std < 0.08 else ("Moderate" if top_uncertainty.std < 0.18 else "High") }} uncertainty</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Top row: images + model bars -->
+<div class="grid-2" style="align-items:start; margin-bottom:0.85rem;">
+
+    <!-- Left: X-ray images -->
+    {% if record.xray_image_path %}
+    <div class="card">
+        <h3>X-ray · Grad-CAM attention</h3>
+        <div class="xray-panels">
+            <figure>
+                <img src="{{ url_for('static', filename=record.xray_image_path) }}" alt="Original X-ray">
+                <figcaption>Original</figcaption>
+            </figure>
+            {% if record.heatmap_image_path %}
+            <figure>
+                <img src="{{ url_for('static', filename=record.heatmap_image_path) }}" alt="Grad-CAM heatmap">
+                <figcaption>Heatmap</figcaption>
+            </figure>
+            {% endif %}
+            {% if record.overlay_image_path %}
+            <figure>
+                <img src="{{ url_for('static', filename=record.overlay_image_path) }}" alt="Overlay">
+                <figcaption>Overlay</figcaption>
+            </figure>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Right: model probability bars -->
+    <div>
+        {% if xray_probs_sorted %}
+        <div class="card" style="margin-bottom:0.85rem;">
+            <h3>X-ray model — findings above threshold</h3>
+            {% for disease, prob in xray_probs_sorted %}
+            <div class="bar-row">
+                <div class="bar-label">{{ disease }}</div>
+                <div class="bar-track"><div class="bar-fill" data-w="{{ (prob * 100)|int }}"></div></div>
+                <div class="bar-value">{{ "%.1f"|format(prob * 100) }}%</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if symptom_probs_sorted %}
+        <div class="card">
+            <h3>Symptom model — all classes</h3>
+            {% for disease, prob in symptom_probs_sorted %}
+            <div class="bar-row">
+                <div class="bar-label">{{ disease }}</div>
+                <div class="bar-track"><div class="bar-fill blue" data-w="{{ (prob * 100)|int }}"></div></div>
+                <div class="bar-value">{{ "%.1f"|format(prob * 100) }}%</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Bottom row: symptom contributions + clinical narrative -->
+<div class="grid-2" style="align-items:start; margin-bottom:0.85rem;">
+
+    {% if symptom_contributions %}
+    <div class="card">
+        <h3>Symptom contributions to "{{ record.top_disease }}" · occlusion estimate</h3>
+        <p style="font-size:0.72rem; color:var(--text-2); margin-bottom:0.75rem; margin-top:-0.4rem;">
+            Each bar shows how much the prediction shifts when that symptom is removed.
+        </p>
+        {% for symptom, delta in symptom_contributions %}
+        <div class="bar-row">
+            <div class="bar-label">{{ symptom.replace("_", " ") }}</div>
+            <div class="bar-track">
+                <div class="bar-fill {{ 'green' if delta > 0 else 'red' }}"
+                     data-w="{{ ((delta|abs) * 100)|int }}"></div>
+            </div>
+            <div class="bar-value {{ 'num-green' if delta > 0 else 'num-red' }}">
+                {{ "+" if delta > 0 else "" }}{{ "%.1f"|format(delta * 100) }}%
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if finding_explanation %}
+    <div class="card" style="border-left:3px solid var(--teal);">
+        <h3>Clinical narrative · generated by Rivela AI</h3>
+        {% if finding_explanation.appearance %}
+        <div class="narrative-section">
+            <h4>What the model looks for</h4>
+            <p style="font-size:0.855rem; line-height:1.7; color:var(--text-2);">{{ finding_explanation.appearance }}</p>
+        </div>
+        {% endif %}
+        {% if finding_explanation.region %}
+        <div class="narrative-section">
+            <h4>Where the model focused (Grad-CAM)</h4>
+            <p style="font-size:0.855rem; line-height:1.7; color:var(--text-2);">{{ finding_explanation.region }}</p>
+        </div>
+        {% endif %}
+        {% if finding_explanation.ranking %}
+        <div class="narrative-section">
+            <h4>Why it ranked above other findings</h4>
+            <p style="font-size:0.855rem; line-height:1.7; color:var(--text-2);">{{ finding_explanation.ranking }}</p>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<div class="disclaimer">{{ disclaimer }}</div>
+
+<script>
+document.querySelectorAll('.bar-fill[data-w]').forEach(el => {
+    el.style.width = el.dataset.w + '%';
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Rivela AI{% endblock %}
+{% block content %}
+
+<div class="page-header">
+    <h1>Welcome back, {{ g.user["username"] }}</h1>
+    <div class="sub">Rivela AI diagnostic support · {{ g.user["role"] }}</div>
+</div>
+
+<div class="stat-cards">
+    <div class="stat-card">
+        <div class="num num-teal">{{ stats.patients }}</div>
+        <div class="label">Patients</div>
+    </div>
+    <div class="stat-card">
+        <div class="num">{{ stats.checkups }}</div>
+        <div class="label">Total checkups</div>
+    </div>
+    <div class="stat-card">
+        <div class="num num-red">{{ stats.conflicts_flagged }}</div>
+        <div class="label">Conflicts flagged</div>
+    </div>
+    <div class="stat-card">
+        <div class="num">{{ stats.avg_confidence }}%</div>
+        <div class="label">Avg fused confidence</div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <h3>Recent activity</h3>
+        {% if recent_activity %}
+            {% for item in recent_activity %}
+            <div class="activity-item">
+                <div class="activity-dot {{ 'red' if item.conflict else '' }}"></div>
+                <div class="activity-body">
+                    <div class="activity-title">
+                        <a href="{{ url_for('patient_analysis', patient_id=item.patient_id, prediction_id=item.id) }}"
+                           style="color:var(--text); font-weight:600;">{{ item.patient_name }}</a>
+                        — {{ item.top_disease or "No finding" }}
+                        {% if item.status %}
+                        <span class="status-pill status-{{ item.status }}">{{ item.status }}</span>
+                        {% endif %}
+                        {% if item.conflict %}
+                        <span class="conflict-badge">Conflict</span>
+                        {% endif %}
+                    </div>
+                    <div class="activity-meta">{{ item.created_at[:16] }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div style="font-size:0.84rem; color:var(--text-3); padding:0.5rem 0;">
+                No checkups yet. <a href="{{ url_for('new_patient') }}">Add a patient →</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h3>Findings this week</h3>
+        {% if findings_this_week %}
+            {% set max_count = findings_this_week[0].count %}
+            {% for f in findings_this_week %}
+            <div class="bar-row">
+                <div class="bar-label">{{ f.disease }}</div>
+                <div class="bar-track">
+                    <div class="bar-fill" style="width:{{ ((f.count / max_count) * 100)|int }}%;"></div>
+                </div>
+                <div class="bar-value">{{ f.count }}</div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div style="font-size:0.84rem; color:var(--text-3); padding:0.5rem 0;">
+                No checkups in the last 7 days.
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

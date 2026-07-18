@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+{% block title %}New checkup — {{ patient.name }}{% endblock %}
+{% block content %}
+
+<div class="page-header-row">
+    <div class="page-header" style="margin-bottom:0;">
+        <h1>New checkup</h1>
+        <div class="sub">{{ patient.name }} · P{{ "%03d"|format(patient.id) }}</div>
+    </div>
+    <a href="{{ url_for('patient_info', patient_id=patient.id) }}" class="btn btn-outline btn-sm">← Back</a>
+</div>
+
+<style>
+.mode-row { display:flex; gap:.75rem }
+.mode-btn {
+    flex:1; padding:.8rem 1rem; border-radius:8px;
+    border:1.5px solid var(--border); background:var(--surface);
+    color:var(--muted); font-size:.88rem; font-weight:600;
+    cursor:pointer; display:flex; align-items:center; gap:.65rem;
+    transition:all .15s;
+}
+.mode-btn.active { border-color:var(--teal); background:rgba(45,212,191,.1); color:var(--teal); }
+.mode-dot {
+    width:16px; height:16px; border-radius:50%;
+    border:2px solid currentColor; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+}
+.mode-btn.active .mode-dot::after {
+    content:''; width:7px; height:7px;
+    background:var(--teal); border-radius:50%;
+}
+.mode-badge {
+    margin-left:auto; font-size:.6rem; font-weight:700;
+    padding:2px 7px; border-radius:4px;
+    background:rgba(45,212,191,.12); color:var(--teal); letter-spacing:.06em;
+}
+
+.upload-zone {
+    border:2px dashed var(--border); border-radius:10px;
+    padding:2.2rem 1.5rem; text-align:center; cursor:pointer;
+    transition:all .2s; background:rgba(255,255,255,.02);
+}
+.upload-zone:hover, .upload-zone.dragover {
+    border-color:var(--teal); background:rgba(45,212,191,.06);
+}
+.upload-icon-box {
+    width:46px; height:46px; margin:0 auto .9rem;
+    background:rgba(45,212,191,.1); border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+}
+.upload-title { font-size:.92rem; font-weight:600; margin-bottom:.25rem; color:var(--text); }
+.upload-sub { font-size:.76rem; color:var(--muted); }
+.upload-tags { margin-top:.75rem; display:flex; justify-content:center; gap:.4rem; }
+.upload-tag {
+    font-size:.62rem; font-weight:700; padding:2px 7px; border-radius:4px;
+    background:rgba(255,255,255,.06); color:var(--muted); letter-spacing:.05em;
+}
+.file-selected-row {
+    display:flex; align-items:center; gap:.85rem;
+    padding:.9rem 1.1rem; border:1.5px solid rgba(45,212,191,.3);
+    border-radius:10px; background:rgba(45,212,191,.07);
+}
+.file-thumb {
+    width:48px; height:48px; background:rgba(0,0,0,.2);
+    border-radius:8px; display:flex; align-items:center;
+    justify-content:center; font-size:1.3rem; flex-shrink:0;
+}
+.file-info { flex:1; min-width:0; }
+.file-name { font-size:.86rem; font-weight:600; color:var(--teal); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.file-size { font-size:.72rem; color:var(--muted); margin-top:2px; }
+.file-clear {
+    width:26px; height:26px; border-radius:50%; flex-shrink:0;
+    border:1px solid var(--border); background:rgba(255,255,255,.04);
+    color:var(--muted); font-size:.8rem; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+}
+
+.sym-group { margin-bottom:1.1rem; }
+.sym-group:last-child { margin-bottom:0; }
+.sym-group-label {
+    font-size:.62rem; font-weight:700; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:.5rem;
+}
+.chips-row { display:flex; flex-wrap:wrap; gap:.45rem; }
+.sym-check { display:none; }
+.chip {
+    padding:.35rem .8rem; border-radius:20px;
+    border:1.5px solid var(--border); background:rgba(255,255,255,.03);
+    color:var(--muted); font-size:.78rem; font-weight:500;
+    cursor:pointer; transition:all .12s; user-select:none;
+}
+.chip:hover { border-color:rgba(45,212,191,.4); color:var(--text); }
+.sym-check:checked + .chip {
+    border-color:var(--teal); background:rgba(45,212,191,.12);
+    color:var(--teal); font-weight:600;
+}
+.sym-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:.85rem; }
+.sym-count {
+    font-size:.7rem; font-weight:700; padding:2px 9px;
+    border-radius:10px; background:rgba(45,212,191,.1);
+    color:var(--teal); border:1px solid rgba(45,212,191,.3); transition:all .15s;
+}
+.sym-count.zero { background:rgba(255,255,255,.04); color:var(--muted); border-color:var(--border); }
+
+.checkup-stack { display:flex; flex-direction:column; gap:1rem; max-width:700px; }
+.checkup-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:1.4rem; }
+.checkup-card-label {
+    font-size:.62rem; font-weight:700; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:1rem;
+}
+</style>
+
+<form method="post" enctype="multipart/form-data">
+<div class="checkup-stack">
+
+    <!-- ── MODE TOGGLE ── -->
+    <div class="checkup-card">
+        <div class="checkup-card-label">Input Mode</div>
+        <div class="mode-row">
+            <div class="mode-btn active" data-mode="both">
+                <div class="mode-dot"></div>
+                X-ray + Symptoms
+                <span class="mode-badge">MULTIMODAL</span>
+            </div>
+            <div class="mode-btn" data-mode="xray">
+                <div class="mode-dot"></div>
+                X-ray only
+            </div>
+        </div>
+        <input type="hidden" name="modality" id="modality-val" value="both">
+    </div>
+
+    <!-- ── X-RAY UPLOAD ── -->
+    <div class="checkup-card" id="xray-section">
+        <div class="checkup-card-label">Chest X-ray Image</div>
+        <div class="upload-zone" id="upload-zone">
+            <div id="upload-empty">
+                <div class="upload-icon-box">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                         stroke="var(--teal)" stroke-width="1.8" stroke-linecap="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                </div>
+                <div class="upload-title">Click to upload or drag &amp; drop</div>
+                <div class="upload-sub">Posteroanterior chest radiograph</div>
+                <div class="upload-tags">
+                    <span class="upload-tag">PNG</span>
+                    <span class="upload-tag">JPG</span>
+                    <span class="upload-tag">JPEG</span>
+                    <span class="upload-tag">Max 16 MB</span>
+                </div>
+            </div>
+            <div id="upload-selected" style="display:none;">
+                <div class="file-selected-row">
+                    <div class="file-thumb">🫁</div>
+                    <div class="file-info">
+                        <div class="file-name" id="file-name-display"></div>
+                        <div class="file-size" id="file-size-display"></div>
+                    </div>
+                    <div class="file-clear" id="file-clear-btn">✕</div>
+                </div>
+            </div>
+        </div>
+        <input type="file" name="xray_image" id="xray_file" accept="image/*" hidden required>
+    </div>
+
+    <!-- ── SYMPTOMS ── -->
+    <div class="checkup-card" id="symptoms-section">
+        <div class="sym-header">
+            <div class="checkup-card-label" style="margin-bottom:0;">Symptoms</div>
+            <span class="sym-count zero" id="sym-count-badge">0 selected</span>
+        </div>
+
+        <div class="sym-group">
+            <div class="sym-group-label">Respiratory</div>
+            <div class="chips-row">
+                <input type="checkbox" name="dry_cough" id="s_dry_cough" class="sym-check"><label for="s_dry_cough" class="chip">dry cough</label>
+                <input type="checkbox" name="productive_cough" id="s_productive_cough" class="sym-check"><label for="s_productive_cough" class="chip">productive cough</label>
+                <input type="checkbox" name="shortness_of_breath" id="s_shortness_of_breath" class="sym-check"><label for="s_shortness_of_breath" class="chip">shortness of breath</label>
+                <input type="checkbox" name="wheezing" id="s_wheezing" class="sym-check"><label for="s_wheezing" class="chip">wheezing</label>
+                <input type="checkbox" name="blood_in_cough" id="s_blood_in_cough" class="sym-check"><label for="s_blood_in_cough" class="chip">blood in cough</label>
+                <input type="checkbox" name="rapid_breathing" id="s_rapid_breathing" class="sym-check"><label for="s_rapid_breathing" class="chip">rapid breathing</label>
+            </div>
+        </div>
+
+        <div class="sym-group">
+            <div class="sym-group-label">Systemic</div>
+            <div class="chips-row">
+                <input type="checkbox" name="fever" id="s_fever" class="sym-check"><label for="s_fever" class="chip">fever</label>
+                <input type="checkbox" name="fatigue" id="s_fatigue" class="sym-check"><label for="s_fatigue" class="chip">fatigue</label>
+                <input type="checkbox" name="weight_loss" id="s_weight_loss" class="sym-check"><label for="s_weight_loss" class="chip">weight loss</label>
+                <input type="checkbox" name="night_sweats" id="s_night_sweats" class="sym-check"><label for="s_night_sweats" class="chip">night sweats</label>
+                <input type="checkbox" name="chills" id="s_chills" class="sym-check"><label for="s_chills" class="chip">chills</label>
+                <input type="checkbox" name="body_aches" id="s_body_aches" class="sym-check"><label for="s_body_aches" class="chip">body aches</label>
+                <input type="checkbox" name="loss_of_appetite" id="s_loss_of_appetite" class="sym-check"><label for="s_loss_of_appetite" class="chip">loss of appetite</label>
+                <input type="checkbox" name="loss_of_smell" id="s_loss_of_smell" class="sym-check"><label for="s_loss_of_smell" class="chip">loss of smell</label>
+                <input type="checkbox" name="loss_of_taste" id="s_loss_of_taste" class="sym-check"><label for="s_loss_of_taste" class="chip">loss of taste</label>
+                <input type="checkbox" name="anxiety" id="s_anxiety" class="sym-check"><label for="s_anxiety" class="chip">anxiety</label>
+                <input type="checkbox" name="smoking_history" id="s_smoking_history" class="sym-check"><label for="s_smoking_history" class="chip">smoking history</label>
+            </div>
+        </div>
+
+        <div class="sym-group">
+            <div class="sym-group-label">Cardiac &amp; Circulatory</div>
+            <div class="chips-row">
+                <input type="checkbox" name="chest_pain" id="s_chest_pain" class="sym-check"><label for="s_chest_pain" class="chip">chest pain</label>
+                <input type="checkbox" name="palpitations" id="s_palpitations" class="sym-check"><label for="s_palpitations" class="chip">palpitations</label>
+                <input type="checkbox" name="leg_swelling" id="s_leg_swelling" class="sym-check"><label for="s_leg_swelling" class="chip">leg swelling</label>
+                <input type="checkbox" name="irregular_heartbeat" id="s_irregular_heartbeat" class="sym-check"><label for="s_irregular_heartbeat" class="chip">irregular heartbeat</label>
+                <input type="checkbox" name="dizziness" id="s_dizziness" class="sym-check"><label for="s_dizziness" class="chip">dizziness</label>
+            </div>
+        </div>
+
+        <div class="sym-group">
+            <div class="sym-group-label">Physical Signs</div>
+            <div class="chips-row">
+                <input type="checkbox" name="clubbing_of_fingers" id="s_clubbing_of_fingers" class="sym-check"><label for="s_clubbing_of_fingers" class="chip">clubbing of fingers</label>
+                <input type="checkbox" name="barrel_chest" id="s_barrel_chest" class="sym-check"><label for="s_barrel_chest" class="chip">barrel chest</label>
+                <input type="checkbox" name="reduced_exercise_tolerance" id="s_reduced_exercise_tolerance" class="sym-check"><label for="s_reduced_exercise_tolerance" class="chip">reduced exercise tolerance</label>
+                <input type="checkbox" name="sudden_onset" id="s_sudden_onset" class="sym-check"><label for="s_sudden_onset" class="chip">sudden onset</label>
+                <input type="checkbox" name="gradual_onset" id="s_gradual_onset" class="sym-check"><label for="s_gradual_onset" class="chip">gradual onset</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── SUBMIT ── -->
+    <div class="checkup-card">
+        <button type="submit" class="btn" style="display:flex;align-items:center;gap:.5rem;font-size:.95rem;padding:.8rem 1.6rem;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            Run Prediction
+        </button>
+    </div>
+
+</div>
+</form>
+
+{% endblock %}
+{% block scripts %}
+<script>
+// ── Mode toggle
+const modeBtns = document.querySelectorAll('.mode-btn');
+const modalityVal = document.getElementById('modality-val');
+const sympSection = document.getElementById('symptoms-section');
+
+modeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        modeBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.dataset.mode;
+        modalityVal.value = mode;
+        sympSection.style.display = mode === 'xray' ? 'none' : '';
+    });
+});
+
+// ── Upload zone
+const zone       = document.getElementById('upload-zone');
+const fileInput  = document.getElementById('xray_file');
+const emptyState = document.getElementById('upload-empty');
+const selState   = document.getElementById('upload-selected');
+const fName      = document.getElementById('file-name-display');
+const fSize      = document.getElementById('file-size-display');
+const clearBtn   = document.getElementById('file-clear-btn');
+
+zone.addEventListener('click', e => {
+    if (!e.target.closest('#file-clear-btn')) fileInput.click();
+});
+
+fileInput.addEventListener('change', function() {
+    if (this.files[0]) showFile(this.files[0]);
+});
+
+function showFile(f) {
+    fName.textContent = f.name;
+    fSize.textContent = (f.size / 1024 / 1024).toFixed(1) + ' MB · Ready for analysis';
+    emptyState.style.display = 'none';
+    selState.style.display   = 'block';
+}
+
+clearBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    fileInput.value = '';
+    emptyState.style.display = 'block';
+    selState.style.display   = 'none';
+});
+
+zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('dragover'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) {
+        fileInput.files = e.dataTransfer.files;
+        showFile(e.dataTransfer.files[0]);
+    }
+});
+
+// ── Symptom count badge
+const badge = document.getElementById('sym-count-badge');
+document.querySelectorAll('.sym-check').forEach(cb => {
+    cb.addEventListener('change', () => {
+        const n = document.querySelectorAll('.sym-check:checked').length;
+        badge.textContent = n + ' selected';
+        badge.className = 'sym-count' + (n === 0 ? ' zero' : '');
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,416 @@
+{% extends "patient_base.html" %}
+{% block tab_content %}
+
+{% if trend_points|length < 2 %}
+<div class="card" style="text-align:center; padding: 2.5rem 1rem;">
+    <p style="color: var(--text-dim); margin-bottom: 0.75rem;">At least 2 checkups are needed to show a longitudinal trend.</p>
+    <a href="{{ url_for('new_checkup', patient_id=patient.id) }}" class="btn">Run another checkup →</a>
+</div>
+{% else %}
+
+{% set first = trend_points[0] %}
+{% set last  = trend_points[-1] %}
+
+{# ── Trend label color ── #}
+{% if trend_label == "Progressing" %}{% set trend_color = "var(--yellow)" %}
+{% elif trend_label == "Improving" %}{% set trend_color = "var(--green)" %}
+{% elif trend_label == "Stable" %}{% set trend_color = "var(--green)" %}
+{% elif trend_label == "Changed" %}{% set trend_color = "var(--yellow)" %}
+{% else %}{% set trend_color = "var(--text-dim)" %}{% endif %}
+
+<!-- ── 4 Stat cards ── -->
+<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.25rem;">
+
+    <!-- Primary finding -->
+    <div class="card" style="padding:1.1rem 1.25rem;">
+        <div style="font-size:0.7rem; color:var(--text-dim); letter-spacing:.06em; text-transform:uppercase; margin-bottom:.4rem;">Primary finding</div>
+        <div style="font-size:1.25rem; font-weight:700; margin-bottom:.2rem;">{{ last.top_disease or "—" }}</div>
+        <div style="font-size:0.82rem; color:var(--text-dim);">
+            {% if last.confidence is not none %}{{ "%.0f"|format(last.confidence*100) }}% confidence{% endif %}
+        </div>
+    </div>
+
+    <!-- Secondary finding -->
+    <div class="card" style="padding:1.1rem 1.25rem;">
+        <div style="font-size:0.7rem; color:var(--text-dim); letter-spacing:.06em; text-transform:uppercase; margin-bottom:.4rem;">Secondary finding</div>
+        {% if secondary_trend %}
+            <div style="font-size:1.25rem; font-weight:700; margin-bottom:.2rem;">{{ secondary_trend.disease }}</div>
+            <div style="font-size:0.82rem; color:var(--text-dim);">
+                {% if secondary_trend.direction == "Rising" %}
+                    <span style="color:var(--yellow);">Rising</span>
+                {% elif secondary_trend.direction == "Falling" %}
+                    <span style="color:var(--green);">Falling</span>
+                {% else %}
+                    <span>Stable</span>
+                {% endif %}
+                {% if secondary_trend.conf_first is not none %}
+                    &mdash; {{ "%.0f"|format(secondary_trend.conf_first*100) }}% → {{ "%.0f"|format(secondary_trend.conf_last*100) }}%
+                {% else %}
+                    &mdash; {{ "%.0f"|format(secondary_trend.conf_last*100) }}%
+                {% endif %}
+            </div>
+        {% else %}
+            <div style="font-size:1rem; color:var(--text-dim);">—</div>
+        {% endif %}
+    </div>
+
+    <!-- Conflict -->
+    <div class="card" style="padding:1.1rem 1.25rem;">
+        <div style="font-size:0.7rem; color:var(--text-dim); letter-spacing:.06em; text-transform:uppercase; margin-bottom:.4rem;">Conflict</div>
+        {% set any_conflict = trend_points | selectattr("conflict") | list %}
+        {% if any_conflict %}
+            <div style="font-size:1.25rem; font-weight:700; color:var(--yellow); margin-bottom:.2rem;">Yes</div>
+            <div style="font-size:0.82rem; color:var(--text-dim);">X-ray vs symptom model</div>
+        {% else %}
+            <div style="font-size:1.25rem; font-weight:700; color:var(--green); margin-bottom:.2rem;">No</div>
+            <div style="font-size:0.82rem; color:var(--text-dim);">Models in agreement</div>
+        {% endif %}
+    </div>
+
+    <!-- Trend -->
+    <div class="card" style="padding:1.1rem 1.25rem;">
+        <div style="font-size:0.7rem; color:var(--text-dim); letter-spacing:.06em; text-transform:uppercase; margin-bottom:.4rem;">Trend</div>
+        <div style="font-size:1.25rem; font-weight:700; color:{{ trend_color }}; margin-bottom:.2rem;">{{ trend_label or "—" }}</div>
+        <div style="font-size:0.82rem; color:var(--text-dim);">{{ trend_note or "" }}</div>
+    </div>
+
+</div>
+
+<!-- ── X-ray + Grad-CAM Comparison ── -->
+{% if compare_first and compare_latest %}
+<div class="card" style="margin-bottom:1.25rem;">
+    <div style="font-size:0.7rem; color:var(--text-dim); letter-spacing:.08em; text-transform:uppercase; margin-bottom:1rem;">X-ray + Grad-CAM comparison across checkups</div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+
+        {# ── Checkup 1 card ── #}
+        {% set cf = compare_first %}
+        {% set cf_w = cf.attention_weight if cf.attention_weight is defined else none %}
+        {% set cf_r = (cf.heatmap_region | replace("-", " ")) if (cf.heatmap_region is defined and cf.heatmap_region) else "" %}
+        <div style="border:1px solid var(--panel-border); border-radius:10px; padding:1rem;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:.6rem;">
+                <div>
+                    <div style="font-weight:700; margin-bottom:.2rem;">Checkup 1</div>
+                    <div style="font-size:0.78rem; color:var(--text-dim);">{{ cf.date }} &middot; {{ cf.top_disease or "—" }} {{ "%.0f"|format(cf.confidence*100) if cf.confidence is not none else "" }}%</div>
+                </div>
+                {% if cf.conflict %}
+                    <span style="background:rgba(245,158,11,.15); color:var(--yellow); font-size:0.72rem; font-weight:600; padding:.25rem .6rem; border-radius:20px; border:1px solid var(--yellow);">Flagged</span>
+                {% elif cf.top_disease == "No Finding" %}
+                    <span style="background:rgba(34,197,94,.15); color:var(--green); font-size:0.72rem; font-weight:600; padding:.25rem .6rem; border-radius:20px; border:1px solid var(--green);">Clear</span>
+                {% elif cf.status %}
+                    <span class="status-pill status-{{ cf.status }}">{{ cf.status }}</span>
+                {% endif %}
+            </div>
+
+            <!-- Images -->
+            <div style="display:flex; gap:.5rem; margin-bottom:.9rem;">
+                <div style="flex:1; text-align:center;">
+                    <img src="{{ url_for('static', filename=cf.xray_image_path) }}"
+                         style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:6px; border:1px solid var(--panel-border);">
+                    <div style="font-size:0.68rem; color:var(--text-dim); margin-top:.25rem;">Original X-ray</div>
+                </div>
+                {% if cf.heatmap_image_path %}
+                <div style="flex:1; text-align:center;">
+                    <img src="{{ url_for('static', filename=cf.heatmap_image_path) }}"
+                         style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:6px; border:1px solid var(--panel-border);">
+                    <div style="font-size:0.68rem; color:var(--text-dim); margin-top:.25rem;">Grad-CAM heatmap</div>
+                </div>
+                {% endif %}
+                {% if cf.overlay_image_path %}
+                <div style="flex:1; text-align:center;">
+                    <img src="{{ url_for('static', filename=cf.overlay_image_path) }}"
+                         style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:6px; border:1px solid var(--panel-border);">
+                    <div style="font-size:0.68rem; color:var(--text-dim); margin-top:.25rem;">Overlay + annotation</div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Attention weight bar -->
+            <div style="margin-bottom:.6rem;">
+                <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-dim); margin-bottom:.3rem;">
+                    <span>Grad-CAM attention weight</span>
+                    <span style="color:var(--green); font-weight:600;">
+                        {% if cf_w is not none %}{{ "%.2f"|format(cf_w) }}{% else %}—{% endif %}
+                        {% if cf_w is not none and cf_w < 0.2 %} — diffuse, low
+                        {% elif cf_w is not none and cf_w < 0.5 %} — moderate
+                        {% elif cf_w is not none %} — focal, high{% endif %}
+                    </span>
+                </div>
+                <div style="background:rgba(255,255,255,.08); border-radius:4px; height:5px; overflow:hidden;">
+                    <div style="height:100%; border-radius:4px; width:{{ ((cf_w or 0)*100)|int }}%;
+                         background:{% if (cf_w or 0) < 0.2 %}var(--green){% elif (cf_w or 0) < 0.5 %}var(--yellow){% else %}var(--red){% endif %};"></div>
+                </div>
+            </div>
+
+            <!-- Description bullet -->
+            <div style="display:flex; gap:.5rem; align-items:flex-start; font-size:0.8rem; color:var(--text-dim);">
+                <span style="color:var(--green); margin-top:.1rem;">●</span>
+                <span>
+                    {% if cf_w is none or cf_w < 0.15 %}
+                        No focal attention — model distributed attention evenly, no region flagged.
+                    {% elif cf_w < 0.35 %}
+                        Moderate focal activation in the {{ cf_r }} region.
+                    {% else %}
+                        High attention concentrated in the {{ cf_r }} region.
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        {# ── Latest checkup card ── #}
+        {% set cl = compare_latest %}
+        {% set cl_w = cl.attention_weight if cl.attention_weight is defined else none %}
+        {% set cl_r = (cl.heatmap_region | replace("-", " ")) if (cl.heatmap_region is defined and cl.heatmap_region) else "" %}
+        {% set w_delta = ((cl_w or 0) - (cf_w or 0)) %}
+        <div style="border:1px solid {% if cl.conflict %}var(--yellow){% else %}var(--panel-border){% endif %}; border-radius:10px; padding:1rem; {% if cl.conflict %}background:rgba(245,158,11,.04);{% endif %}">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:.6rem;">
+                <div>
+                    <div style="font-weight:700; margin-bottom:.2rem;">Checkup {{ trend_points|length }} — today</div>
+                    <div style="font-size:0.78rem; color:var(--text-dim);">{{ cl.date }} &middot; {{ cl.top_disease or "—" }} {{ "%.0f"|format(cl.confidence*100) if cl.confidence is not none else "" }}{% if cl.conflict %} &middot; Conflict flagged{% endif %}</div>
+                </div>
+                {% if cl.conflict %}
+                    <span style="background:rgba(245,158,11,.15); color:var(--yellow); font-size:0.72rem; font-weight:600; padding:.25rem .6rem; border-radius:20px; border:1px solid var(--yellow);">Flagged</span>
+                {% elif cl.top_disease == "No Finding" %}
+                    <span style="background:rgba(34,197,94,.15); color:var(--green); font-size:0.72rem; font-weight:600; padding:.25rem .6rem; border-radius:20px; border:1px solid var(--green);">Clear</span>
+                {% elif cl.status %}
+                    <span class="status-pill status-{{ cl.status }}">{{ cl.status }}</span>
+                {% endif %}
+            </div>
+
+            <!-- Images -->
+            <div style="display:flex; gap:.5rem; margin-bottom:.9rem;">
+                <div style="flex:1; text-align:center;">
+                    <img src="{{ url_for('static', filename=cl.xray_image_path) }}"
+                         style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:6px; border:1px solid var(--panel-border);">
+                    <div style="font-size:0.68rem; color:var(--text-dim); margin-top:.25rem;">Original X-ray</div>
+                </div>
+                {% if cl.heatmap_image_path %}
+                <div style="flex:1; text-align:center;">
+                    <img src="{{ url_for('static', filename=cl.heatmap_image_path) }}"
+                         style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:6px; border:1px solid var(--panel-border);">
+                    <div style="font-size:0.68rem; color:var(--text-dim); margin-top:.25rem;">Grad-CAM heatmap</div>
+                </div>
+                {% endif %}
+                {% if cl.overlay_image_path %}
+                <div style="flex:1; text-align:center;">
+                    <img src="{{ url_for('static', filename=cl.overlay_image_path) }}"
+                         style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:6px; border:1px solid var(--panel-border);">
+                    <div style="font-size:0.68rem; color:var(--text-dim); margin-top:.25rem;">Overlay + annotation</div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Attention weight bar -->
+            <div style="margin-bottom:.6rem;">
+                <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-dim); margin-bottom:.3rem;">
+                    <span>Grad-CAM attention weight</span>
+                    <span style="color:{% if (cl_w or 0) >= 0.5 %}var(--yellow){% elif (cl_w or 0) >= 0.2 %}var(--yellow){% else %}var(--green){% endif %}; font-weight:600;">
+                        {% if cl_w is not none %}{{ "%.2f"|format(cl_w) }}{% else %}—{% endif %}
+                        {% if w_delta > 0.05 %} ↑{% elif w_delta < -0.05 %} ↓{% endif %}
+                        {% if cl_r %} {{ cl_r }} region{% endif %}
+                    </span>
+                </div>
+                <div style="background:rgba(255,255,255,.08); border-radius:4px; height:5px; overflow:hidden;">
+                    <div style="height:100%; border-radius:4px; width:{{ ((cl_w or 0)*100)|int }}%;
+                         background:{% if (cl_w or 0) < 0.2 %}var(--green){% elif (cl_w or 0) < 0.5 %}var(--yellow){% else %}var(--red){% endif %};"></div>
+                </div>
+            </div>
+
+            <!-- Description bullet -->
+            <div style="display:flex; gap:.5rem; align-items:flex-start; font-size:0.8rem; color:var(--text-dim);">
+                <span style="color:{% if cl.conflict %}var(--yellow){% else %}var(--accent){% endif %}; margin-top:.1rem;">●</span>
+                <span>
+                    {% if cl_w is none or cl_w < 0.15 %}
+                        No focal attention — model distributed attention evenly, no region flagged.
+                    {% elif cl_w < 0.35 %}
+                        Moderate focal activation{% if cl_r %} in the {{ cl_r }} region{% endif %}.{% if cl.conflict %} Symptom model attention: {{ cl.second_disease or "—" }} (conflict).{% endif %}
+                    {% else %}
+                        High attention concentrated{% if cl_r %} on {{ cl_r }} region{% endif %}
+                        — {% if w_delta > 0.10 %}enlarged vs checkup 1. {% endif %}
+                        {% if cl.conflict %}Symptom model attention: {{ cl.second_disease or "—" }} (conflict).{% endif %}
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endif %}
+
+<!-- ── What changed between visits ── -->
+<div class="card" style="margin-bottom:1.25rem;">
+    <h3 style="margin-top:0; margin-bottom:1rem;">What changed between visits</h3>
+    <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+        <thead>
+            <tr style="color:var(--text-dim);">
+                <th style="text-align:left; padding:.4rem .75rem; border-bottom:1px solid var(--panel-border); font-weight:500;">Metric</th>
+                <th style="text-align:left; padding:.4rem .75rem; border-bottom:1px solid var(--panel-border); font-weight:500;">Checkup 1</th>
+                <th style="text-align:left; padding:.4rem .75rem; border-bottom:1px solid var(--panel-border); font-weight:500;">Checkup {{ trend_points|length }} (latest)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Primary diagnosis -->
+            <tr style="border-bottom:1px solid var(--panel-border);">
+                <td style="padding:.55rem .75rem; color:var(--text-dim);">Primary diagnosis</td>
+                <td style="padding:.55rem .75rem;">{{ first.top_disease or "—" }}{% if first.confidence is not none %} ({{ "%.0f"|format(first.confidence*100) }}%){% endif %}</td>
+                <td style="padding:.55rem .75rem; font-weight:600;
+                    {% if first.top_disease != last.top_disease %}color:var(--yellow);{% endif %}">
+                    {{ last.top_disease or "—" }}{% if last.confidence is not none %} ({{ "%.0f"|format(last.confidence*100) }}%){% endif %}
+                </td>
+            </tr>
+            <!-- Grad-CAM focus -->
+            <tr style="border-bottom:1px solid var(--panel-border);">
+                <td style="padding:.55rem .75rem; color:var(--text-dim);">Grad-CAM focus</td>
+                <td style="padding:.55rem .75rem;">
+                    {% set fr = first.heatmap_region %}
+                    {% if fr %}{{ fr | replace("-", " ") | title }}{% else %}Diffuse — no focal region{% endif %}
+                </td>
+                <td style="padding:.55rem .75rem;
+                    {% if last.heatmap_region and last.heatmap_region != first.heatmap_region %}color:var(--yellow); font-weight:600;{% endif %}">
+                    {% set lr = last.heatmap_region %}
+                    {% if lr %}{{ lr | replace("-", " ") | title }}{% else %}Diffuse — no focal region{% endif %}
+                </td>
+            </tr>
+            <!-- Attention weight -->
+            <tr style="border-bottom:1px solid var(--panel-border);">
+                <td style="padding:.55rem .75rem; color:var(--text-dim);">Attention weight</td>
+                <td style="padding:.55rem .75rem;">
+                    {% if first.attention_weight is not none %}
+                        {{ "%.2f"|format(first.attention_weight) }} —
+                        {% if first.attention_weight < 0.2 %}low, diffuse{% elif first.attention_weight < 0.5 %}moderate{% else %}high, focal{% endif %}
+                    {% else %}—{% endif %}
+                </td>
+                <td style="padding:.55rem .75rem;
+                    {% if last.attention_weight is not none and first.attention_weight is not none and (last.attention_weight - first.attention_weight) > 0.1 %}color:var(--yellow); font-weight:600;{% endif %}">
+                    {% if last.attention_weight is not none %}
+                        {{ "%.2f"|format(last.attention_weight) }} —
+                        {% if last.attention_weight < 0.2 %}low, diffuse{% elif last.attention_weight < 0.5 %}moderate{% else %}high, focal{% endif %}
+                        {% if last.attention_weight is not none and first.attention_weight is not none %}
+                            {% if (last.attention_weight - first.attention_weight) > 0.05 %} ↑{% elif (last.attention_weight - first.attention_weight) < -0.05 %} ↓{% endif %}
+                        {% endif %}
+                    {% else %}—{% endif %}
+                </td>
+            </tr>
+            <!-- Secondary disease -->
+            {% if secondary_trend %}
+            <tr style="border-bottom:1px solid var(--panel-border);">
+                <td style="padding:.55rem .75rem; color:var(--text-dim);">{{ secondary_trend.disease }} probability</td>
+                <td style="padding:.55rem .75rem;">
+                    {% if secondary_trend.conf_first is not none %}{{ "%.0f"|format(secondary_trend.conf_first*100) }}%{% else %}—{% endif %}
+                </td>
+                <td style="padding:.55rem .75rem; font-weight:600;
+                    {% if secondary_trend.direction == 'Rising' %}color:var(--yellow);{% elif secondary_trend.direction == 'Falling' %}color:var(--green);{% endif %}">
+                    {{ "%.0f"|format(secondary_trend.conf_last*100) }}%
+                    {% if secondary_trend.direction == 'Rising' %} ↑{% elif secondary_trend.direction == 'Falling' %} ↓{% endif %}
+                </td>
+            </tr>
+            {% endif %}
+            <!-- Modality conflict -->
+            <tr style="border-bottom:1px solid var(--panel-border);">
+                <td style="padding:.55rem .75rem; color:var(--text-dim);">Modality conflict</td>
+                <td style="padding:.55rem .75rem; color:var(--text-dim);">
+                    {% if first.conflict %}
+                        <span style="color:var(--yellow);">{{ first.conflict_detail or "Yes" }}</span>
+                    {% else %}None{% endif %}
+                </td>
+                <td style="padding:.55rem .75rem;">
+                    {% if last.conflict %}
+                        <span style="background:rgba(245,158,11,.12); color:var(--yellow); font-size:0.78rem; padding:.2rem .5rem; border-radius:12px; border:1px solid rgba(245,158,11,.3);">
+                            {{ last.conflict_detail or "Yes" }}
+                        </span>
+                    {% else %}
+                        <span style="color:var(--text-dim);">None</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <!-- Status -->
+            <tr>
+                <td style="padding:.55rem .75rem; color:var(--text-dim);">Status</td>
+                <td style="padding:.55rem .75rem;">
+                    {% if first.status %}<span class="status-pill status-{{ first.status }}">{{ first.status }}</span>{% else %}—{% endif %}
+                </td>
+                <td style="padding:.55rem .75rem;">
+                    {% if last.status %}<span class="status-pill status-{{ last.status }}">{{ last.status }}</span>{% else %}—{% endif %}
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- ── Follow-up plan ── -->
+{% if follow_up_plan %}
+<div class="card" style="margin-bottom:1.25rem;">
+    <div style="display:flex; align-items:center; gap:.5rem; margin-bottom:1rem;">
+        <span style="font-size:1rem;">📋</span>
+        <h3 style="margin:0;">Follow-up plan</h3>
+    </div>
+    {% for item in follow_up_plan %}
+    <div style="display:flex; gap:.85rem; align-items:flex-start; margin-bottom:{% if not loop.last %}1rem{% else %}0{% endif %};">
+        <div style="width:28px; height:28px; border-radius:50%; background:var(--accent); color:#fff; font-size:0.78rem; font-weight:700;
+                    display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:.05rem;">{{ loop.index }}</div>
+        <div>
+            <div style="font-weight:600; font-size:0.9rem; margin-bottom:.2rem;">{{ item.title }}</div>
+            <div style="font-size:0.82rem; color:var(--text-dim); line-height:1.5;">{{ item.detail }}</div>
+        </div>
+    </div>
+    {% endfor %}
+    <p style="font-size:0.72rem; color:var(--text-dim); margin:1rem 0 0 0; border-top:1px solid var(--panel-border); padding-top:.75rem;">
+        The follow-up suggestions above are derived from AI model outputs only. All clinical decisions remain the responsibility of the treating clinician.
+    </p>
+</div>
+{% endif %}
+
+<!-- ── Confidence over time chart ── -->
+<div class="card">
+    <h3 style="margin-top:0;">Confidence over time</h3>
+    <canvas id="trendChart" height="70"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+const trend = {{ trend_json | safe }};
+const statusColors = { confirmed:'#22c55e', possible:'#f59e0b', uncertain:'#ef4444' };
+const pointColors = trend.map(p => statusColors[p.status] || '#3b82f6');
+
+new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+        labels: trend.map((p, i) => `#${i+1} ${p.date}`),
+        datasets: [{
+            data: trend.map(p => p.confidence !== null ? +(p.confidence*100).toFixed(1) : null),
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.1)',
+            pointBackgroundColor: pointColors,
+            pointBorderColor: pointColors,
+            pointRadius: 7, pointHoverRadius: 9,
+            fill: true, tension: 0.3, spanGaps: true,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: ctx => {
+                        const p = trend[ctx.dataIndex];
+                        const lines = [];
+                        if (p.confidence !== null) lines.push(`Confidence: ${(p.confidence*100).toFixed(1)}%`);
+                        if (p.top_disease) lines.push(`Disease: ${p.top_disease}`);
+                        if (p.status) lines.push(`Status: ${p.status}`);
+                        if (p.conflict) lines.push('⚠ Models conflicted');
+                        return lines;
+                    }
+                }
+            }
+        },
+        scales: {
+            x: { ticks:{color:'#8993b0'}, grid:{color:'rgba(255,255,255,0.06)'} },
+            y: { min:0, max:100, ticks:{color:'#8993b0', callback:v=>v+'%'}, grid:{color:'rgba(255,255,255,0.06)'} }
+        }
+    }
+});
+</script>
+
+{% endif %}
+{% endblock %}

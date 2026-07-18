@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Rivela AI — {{ patient.name }} Full Report</title>
+    <style>
+        @page { size: A4; margin: 1.5cm 1.8cm; }
+
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            color: #1a1a1a;
+            font-size: 9pt;
+            line-height: 1.5;
+        }
+
+        /* ── Cover ── */
+        .cover-bar {
+            background: #0f2540;
+            color: #ffffff;
+            padding: 10px 14px;
+            margin-bottom: 6px;
+        }
+        .cover-bar h1 { margin: 0; font-size: 16pt; font-weight: bold; }
+        .cover-bar .sub { font-size: 8pt; color: #aac4e0; margin-top: 3px; }
+        .cover-meta {
+            border: 1px solid #c8d8e8;
+            background: #f0f6ff;
+            padding: 6px 10px;
+            font-size: 8pt;
+            margin-bottom: 14px;
+        }
+
+        /* ── Section divider ── */
+        .checkup-bar {
+            background: #0f2540;
+            color: #ffffff;
+            padding: 5px 10px;
+            margin-bottom: 8px;
+            margin-top: 14px;
+        }
+        .checkup-bar td { color: #ffffff; font-size: 9pt; }
+        .checkup-bar .num { font-weight: bold; font-size: 11pt; }
+        .checkup-bar .meta { font-size: 7.5pt; color: #aac4e0; text-align: right; }
+
+        /* ── Images ── */
+        .img-table { width: 100%; margin-bottom: 10px; }
+        .img-table td { text-align: center; vertical-align: bottom; padding: 0 4px; }
+        .img-table img { border: 1px solid #cccccc; width: 160px; height: 160px; }
+        .img-caption { font-size: 7pt; color: #555555; margin-top: 3px; }
+
+        /* ── Data tables ── */
+        .section-title {
+            font-size: 8pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5pt;
+            color: #0f2540;
+            border-bottom: 1.5px solid #0f2540;
+            padding-bottom: 2px;
+            margin-top: 8px;
+            margin-bottom: 4px;
+        }
+        table.data { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+        table.data th {
+            background: #e8f0f8;
+            border: 1px solid #b0c8e0;
+            padding: 3px 6px;
+            font-size: 8pt;
+            font-weight: bold;
+            text-align: left;
+        }
+        table.data td {
+            border: 1px solid #c8d8e8;
+            padding: 3px 6px;
+            font-size: 8pt;
+        }
+        table.data tr:nth-child(even) td { background: #f5f9ff; }
+
+        .pill {
+            display: inline;
+            padding: 1px 6px;
+            border-radius: 8px;
+            font-size: 7.5pt;
+            font-weight: bold;
+        }
+        .pill-confirmed { background: #d4edda; color: #155724; }
+        .pill-possible  { background: #fff3cd; color: #856404; }
+        .pill-uncertain { background: #f8d7da; color: #721c24; }
+
+        /* ── Narrative ── */
+        .narrative {
+            background: #f5f9ff;
+            border-left: 3px solid #0f2540;
+            padding: 6px 10px;
+            font-size: 8pt;
+            line-height: 1.6;
+            margin-bottom: 6px;
+        }
+
+        /* ── Page break ── */
+        .page-break { page-break-before: always; }
+
+        /* ── Disclaimer ── */
+        .disclaimer {
+            font-size: 7pt;
+            color: #777777;
+            border-top: 1px solid #cccccc;
+            margin-top: 20px;
+            padding-top: 6px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Cover -->
+<div class="cover-bar">
+    <h1>Rivela AI Clinical Report</h1>
+    <div class="sub">AI-assisted chest disease decision support — for clinical review only</div>
+</div>
+<table class="cover-meta" width="100%">
+    <tr>
+        <td><strong>Patient:</strong> {{ patient["name"] }}</td>
+        {% if patient["dob"] %}<td><strong>DOB:</strong> {{ patient["dob"] }}</td>{% endif %}
+        {% if patient["sex"] %}<td><strong>Sex:</strong> {{ patient["sex"]|capitalize }}</td>{% endif %}
+        <td><strong>Total checkups:</strong> {{ records_with_data|length }}</td>
+        <td style="text-align:right;"><strong>Generated:</strong> {{ generated_date }}</td>
+    </tr>
+</table>
+
+{% for item in records_with_data %}
+{% set r = item.record %}
+
+{% if not loop.first %}<div class="page-break"></div>{% endif %}
+
+<!-- Checkup header bar -->
+<table class="checkup-bar" width="100%">
+    <tr>
+        <td class="num">Checkup {{ loop.index }}</td>
+        <td class="meta">{{ r.created_at[:16] }} &nbsp;|&nbsp; Clinician: {{ r.clinician_username }}</td>
+    </tr>
+</table>
+
+<!-- X-ray images -->
+{% if r.xray_image_path %}
+<div class="section-title">Imaging</div>
+<table class="img-table">
+    <tr>
+        <td>
+            <img src="/static/{{ r.xray_image_path }}" alt="X-ray">
+            <div class="img-caption">Original X-ray</div>
+        </td>
+        {% if r.heatmap_image_path %}
+        <td>
+            <img src="/static/{{ r.heatmap_image_path }}" alt="Grad-CAM">
+            <div class="img-caption">Grad-CAM heatmap</div>
+        </td>
+        {% endif %}
+        {% if r.overlay_image_path %}
+        <td>
+            <img src="/static/{{ r.overlay_image_path }}" alt="Overlay">
+            <div class="img-caption">Grad-CAM overlay</div>
+        </td>
+        {% endif %}
+        <!-- pad remaining cells so columns stay even -->
+        {% if not r.heatmap_image_path %}<td></td>{% endif %}
+        {% if not r.overlay_image_path %}<td></td>{% endif %}
+    </tr>
+</table>
+{% endif %}
+
+<!-- Primary finding -->
+<div class="section-title">Primary Finding</div>
+<table class="data">
+    <tr>
+        <th>Finding</th>
+        <th>Confidence</th>
+        <th>Status</th>
+        <th>Modality</th>
+    </tr>
+    <tr>
+        <td><strong>{{ r.top_disease or "—" }}</strong></td>
+        <td>
+            {% if r.fusion_result %}{{ "%.1f"|format(r.fusion_result.top_score * 100) }}%
+            {% elif r.xray_probs and r.top_disease in r.xray_probs %}{{ "%.1f"|format(r.xray_probs[r.top_disease] * 100) }}%
+            {% elif r.symptom_probs and r.top_disease in r.symptom_probs %}{{ "%.1f"|format(r.symptom_probs[r.top_disease] * 100) }}%
+            {% else %}—{% endif %}
+        </td>
+        <td>
+            {% set st = r.fusion_result.status if r.fusion_result else r.status %}
+            {% if st %}<span class="pill pill-{{ st }}">{{ st }}</span>{% else %}—{% endif %}
+        </td>
+        <td>
+            {% if r.fusion_result %}Fused (X-ray + Symptoms)
+            {% elif r.xray_probs %}X-ray only
+            {% elif r.symptom_probs %}Symptoms only
+            {% else %}—{% endif %}
+        </td>
+    </tr>
+</table>
+
+<!-- Two-column: X-ray probs + Symptom probs -->
+{% if r.xray_probs or r.symptom_probs %}
+<table width="100%" style="margin-bottom:6px;">
+    <tr style="vertical-align:top;">
+        {% if r.xray_probs %}
+        <td style="width:50%; padding-right:6px;">
+            <div class="section-title">X-ray Model Probabilities</div>
+            <table class="data" width="100%">
+                <tr><th>Disease</th><th>Probability</th></tr>
+                {% for disease, prob in r.xray_probs.items()|sort(attribute='1', reverse=True) %}
+                {% if prob >= 0.05 %}
+                <tr><td>{{ disease }}</td><td>{{ "%.1f"|format(prob * 100) }}%</td></tr>
+                {% endif %}
+                {% endfor %}
+            </table>
+        </td>
+        {% endif %}
+        {% if r.symptom_probs %}
+        <td style="width:50%; padding-left:6px;">
+            <div class="section-title">Symptom Model Probabilities</div>
+            <table class="data" width="100%">
+                <tr><th>Disease</th><th>Probability</th></tr>
+                {% for disease, prob in r.symptom_probs.items()|sort(attribute='1', reverse=True) %}
+                {% if prob >= 0.05 %}
+                <tr><td>{{ disease }}</td><td>{{ "%.1f"|format(prob * 100) }}%</td></tr>
+                {% endif %}
+                {% endfor %}
+            </table>
+        </td>
+        {% endif %}
+    </tr>
+</table>
+{% endif %}
+
+<!-- Reported symptoms -->
+{% if item.checked_symptoms %}
+<div class="section-title">Reported Symptoms</div>
+<p style="margin:2px 0 6px 0; font-size:8pt;">{{ item.checked_symptoms | join(", ") }}</p>
+{% endif %}
+
+<!-- Clinical narrative -->
+<div class="section-title">Clinical Narrative</div>
+<div class="narrative">{{ item.narrative }}</div>
+
+{% endfor %}
+
+<div class="disclaimer">{{ disclaimer }}</div>
+
+</body>
+</html>

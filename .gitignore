@@ -1,0 +1,23 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Secrets — never commit these
+instance/gemini_key.txt
+.env
+
+# SQLite database — Railway starts fresh each deploy
+instance/chestai.db
+
+# Patient X-ray uploads — sensitive data, large files
+static/uploads/
+
+# Logs
+LOGS/
+
+# IDE / OS
+.claude/
+.vscode/
+.DS_Store
+Thumbs.db

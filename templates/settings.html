@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Settings — Rivela AI{% endblock %}
+{% block content %}
+
+<div class="page-header">
+    <h1>Settings</h1>
+    <div class="sub">Account preferences and system information</div>
+</div>
+
+{% if success %}
+<div class="flash flash-success">{{ success }}</div>
+{% endif %}
+{% if error %}
+<div class="flash">{{ error }}</div>
+{% endif %}
+
+<div style="max-width: 520px;">
+
+    <div class="card" style="margin-bottom:0.85rem;">
+        <h3>Account info</h3>
+        <div class="field"><div class="k">Username</div><div class="v mono">{{ g.user["username"] }}</div></div>
+        <div class="field"><div class="k">Role</div><div class="v">{{ g.user["role"]|capitalize }}</div></div>
+        <div class="field"><div class="k">Account created</div><div class="v mono">{{ g.user["created_at"][:16] }}</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:0.85rem;">
+        <h3>Change username</h3>
+        <form method="POST">
+            <input type="hidden" name="action" value="update_username">
+            <div class="form-group">
+                <label class="form-label">New username</label>
+                <input type="text" name="username" value="{{ g.user['username'] }}" required autocomplete="username">
+            </div>
+            <button type="submit" class="btn btn-sm">Update username</button>
+        </form>
+    </div>
+
+    <div class="card" style="margin-bottom:0.85rem;">
+        <h3>Change password</h3>
+        <form method="POST">
+            <input type="hidden" name="action" value="update_password">
+            <div class="form-group">
+                <label class="form-label">Current password</label>
+                <input type="password" name="current_password" required autocomplete="current-password">
+            </div>
+            <div class="form-group">
+                <label class="form-label">New password</label>
+                <input type="password" name="new_password" required minlength="6" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Confirm new password</label>
+                <input type="password" name="confirm_password" required minlength="6" autocomplete="new-password">
+            </div>
+            <button type="submit" class="btn btn-sm">Update password</button>
+        </form>
+    </div>
+
+
+</div>
+{% endblock %}
