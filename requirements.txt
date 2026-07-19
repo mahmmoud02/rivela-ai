@@ -3,8 +3,8 @@
 flask
 gunicorn
 werkzeug
-torch==2.4.0+cpu
-torchvision==0.19.0+cpu
+torch==2.5.1+cpu
+torchvision==0.20.1+cpu
 Pillow
 numpy
 matplotlib
