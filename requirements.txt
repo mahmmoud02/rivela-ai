@@ -4,9 +4,10 @@ flask
 gunicorn
 werkzeug
 torch==2.5.1+cpu
-torchvision==0.20.1+cpu
+torchvision==0.28.0+cpu
 Pillow
 numpy
 matplotlib
 google-genai
 xhtml2pdf
+
